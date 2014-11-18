@@ -43,7 +43,6 @@
 #include <linux/export.h>
 
 #include <asm/processor.h>
-#include <asm/tlbflush.h>
 #include <asm/mce.h>
 #include <asm/msr.h>
 
@@ -661,7 +660,6 @@ static int mce_no_way_out(struct mce *m, char **msg, unsigned long *validp,
 			  struct pt_regs *regs)
 {
 	int i, ret = 0;
-	char *tmp;
 
 	for (i = 0; i < mca_cfg.banks; i++) {
 		m->status = mce_rdmsrl(MSR_IA32_MCx_STATUS(i));
@@ -670,11 +668,9 @@ static int mce_no_way_out(struct mce *m, char **msg, unsigned long *validp,
 			if (quirk_no_way_out)
 				quirk_no_way_out(i, m, regs);
 		}
-
-		if (mce_severity(m, mca_cfg.tolerant, &tmp, true) >= MCE_PANIC_SEVERITY) {
-			*msg = tmp;
+		if (mce_severity(m, mca_cfg.tolerant, msg, true) >=
+		    MCE_PANIC_SEVERITY)
 			ret = 1;
-		}
 	}
 	return ret;
 }
@@ -1461,7 +1457,7 @@ static void __mcheck_cpu_init_generic(void)
 	bitmap_fill(all_banks, MAX_NR_BANKS);
 	machine_check_poll(MCP_UC | m_fl, &all_banks);
 
-	cr4_set_bits(X86_CR4_MCE);
+	set_in_cr4(X86_CR4_MCE);
 
 	rdmsrl(MSR_IA32_MCG_CAP, cap);
 	if (cap & MCG_CTL_P)
