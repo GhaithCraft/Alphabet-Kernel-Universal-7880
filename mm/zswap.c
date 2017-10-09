@@ -95,11 +95,7 @@ static bool zswap_enabled __read_mostly = 1;
 module_param_named(enabled, zswap_enabled, bool, 0444);
 
 /* Compressor to be used by zswap (fixed at boot for now) */
-#ifdef CONFIG_CRYPTO_LZ4
 #define ZSWAP_COMPRESSOR_DEFAULT "lz4"
-#else
-#define ZSWAP_COMPRESSOR_DEFAULT "lzo"
-#endif
 #define ZSWAP_COMPRESSOR "lz4"
 static char *zswap_compressor = ZSWAP_COMPRESSOR;
 module_param_named(compressor, zswap_compressor, charp, 0444);
@@ -109,11 +105,11 @@ static unsigned int zswap_max_pool_percent = 500;
 module_param_named(max_pool_percent,
 			zswap_max_pool_percent, uint, 0644);
 
-static unsigned int zswap_high_pool_percent = 30;
+static unsigned int zswap_high_pool_percent = 40;
 module_param_named(high_pool_percent,
 			zswap_high_pool_percent, uint, 0644);
 
-static unsigned int zswap_low_pool_percent = 25;
+static unsigned int zswap_low_pool_percent = 38;
 module_param_named(low_pool_percent,
 			zswap_low_pool_percent, uint, 0644);
 
