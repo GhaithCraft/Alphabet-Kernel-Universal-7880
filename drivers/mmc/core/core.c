@@ -47,12 +47,6 @@
 #include "sd_ops.h"
 #include "sdio_ops.h"
 
-#ifdef CONFIG_MMC_SUPPORT_STLOG
-#include <linux/stlog.h>
-#else
-#define ST_LOG(fmt,...)
-#endif
-
 /* If the device is not responding */
 #define MMC_CORE_TIMEOUT_MS	(10 * 60 * 1000) /* 10 minute timeout */
 
@@ -71,7 +65,7 @@ static const unsigned freqs[] = { 400000, 300000, 200000, 100000 };
  * So we allow it it to be disabled.
  */
 bool use_spi_crc = 0;
-module_param(use_spi_crc, bool, 0);
+module_param(use_spi_crc, bool, 0644);
 
 /*
  * Internal function. Schedule delayed work in the MMC work queue.
@@ -404,14 +398,14 @@ static int mmc_wait_for_data_req_done(struct mmc_host *host,
 			cmd = mrq->cmd;
 
 			if (!cmd->error || !cmd->retries ||
-			    mmc_card_removed(host->card)) {
+					mmc_card_removed(host->card)) {
 				err = host->areq->err_check(host->card,
-							    host->areq);
+						host->areq);
 				break; /* return err */
 			} else {
 				pr_info("%s: req failed (CMD%u): %d, retrying...\n",
-					mmc_hostname(host),
-					cmd->opcode, cmd->error);
+						mmc_hostname(host),
+						cmd->opcode, cmd->error);
 				cmd->retries--;
 				cmd->error = 0;
 				host->ops->request(host, mrq);
@@ -595,10 +589,9 @@ EXPORT_SYMBOL(mmc_start_req);
 void mmc_wait_for_req(struct mmc_host *host, struct mmc_request *mrq)
 {
 #ifdef CONFIG_MMC_BLOCK_DEFERRED_RESUME
-   if (mmc_bus_needs_resume(host))
-	   mmc_resume_bus(host);
+	if (mmc_bus_needs_resume(host))
+		mmc_resume_bus(host);
 #endif
-
 	__mmc_start_req(host, mrq);
 	mmc_wait_for_req_done(host, mrq);
 }
@@ -1406,6 +1399,17 @@ int __mmc_set_signal_voltage(struct mmc_host *host, int signal_voltage)
 	int err = 0;
 	int old_signal_voltage = host->ios.signal_voltage;
 
+#if defined(CONFIG_BCM43454) || defined(CONFIG_BCM43454_MODULE) || \
+	defined(CONFIG_BCM43455) || defined(CONFIG_BCM43455_MODULE)
+	/* Some devices use only dedicated specific signaling level for
+	 * design reasons. MMC_CAP2_BROKEN_VOLTAGE flag is used when
+	 * there is no needs to change to any signaling level.
+	 */
+	if (host->caps2 & MMC_CAP2_BROKEN_VOLTAGE)
+		return 0;
+#endif /*(CONFIG_BCM43454) || (CONFIG_BCM43454_MODULE) || \
+	(CONFIG_BCM43455) || (CONFIG_BCM43455_MODULE)*/
+
 	host->ios.signal_voltage = signal_voltage;
 	if (host->ops->start_signal_voltage_switch) {
 		mmc_host_clk_hold(host);
@@ -1427,6 +1431,17 @@ int mmc_set_signal_voltage(struct mmc_host *host, int signal_voltage, u32 ocr)
 	u32 clock;
 
 	BUG_ON(!host);
+
+#if defined(CONFIG_BCM43454) || defined(CONFIG_BCM43454_MODULE) || \
+	defined(CONFIG_BCM43455) || defined(CONFIG_BCM43455_MODULE)
+	/* Some devices use only dedicated specific signaling level for
+	 * design reasons. MMC_CAP2_BROKEN_VOLTAGE flag is used when
+	 * there is no needs to change to any signaling level.
+	 */
+	if (host->caps2 & MMC_CAP2_BROKEN_VOLTAGE)
+		return 0;
+#endif /*(CONFIG_BCM43454) || (CONFIG_BCM43454_MODULE) || \
+	(CONFIG_BCM43455) || (CONFIG_BCM43455_MODULE)*/
 
 	/*
 	 * Send CMD11 only if the request is to switch the card to
@@ -1669,7 +1684,6 @@ int mmc_resume_bus(struct mmc_host *host)
 {
 	unsigned long flags;
 	int err = 0;
-
 	if (!mmc_bus_needs_resume(host))
 		return -EINVAL;
 
@@ -2152,13 +2166,12 @@ EXPORT_SYMBOL(mmc_can_discard);
 
 int mmc_can_sanitize(struct mmc_card *card)
 {
-	/* do not use sanitize*/
-	return 0;
-
+#ifdef CONFIG_MMC_SANITIZE_ENABLE
 	if (!mmc_can_trim(card) && !mmc_can_erase(card))
 		return 0;
 	if (card->ext_csd.sec_feature_support & EXT_CSD_SEC_SANITIZE)
 		return 1;
+#endif /* CONFIG_MMC_SANITIZE_ENABLE*/
 	return 0;
 }
 EXPORT_SYMBOL(mmc_can_sanitize);
@@ -2430,13 +2443,16 @@ int _mmc_detect_card_removed(struct mmc_host *host)
 	 */
 	if (!ret && host->ops->get_cd && !host->ops->get_cd(host)) {
 		mmc_detect_change(host, msecs_to_jiffies(200));
-		pr_err("%s: card removed too slowly\n", mmc_hostname(host));
+		pr_debug("%s: card removed too slowly\n", mmc_hostname(host));
 	}
+
+	if (ret && !strcmp("mmc1", mmc_hostname(host)) &&
+			host->ops->get_cd && host->ops->get_cd(host))
+		ret =0;
 
 	if (ret) {
 		mmc_card_set_removed(host->card);
-		pr_err("%s: card remove detected\n", mmc_hostname(host));
-		ST_LOG("<%s> %s: card remove detected\n", __func__,mmc_hostname(host));
+		pr_debug("%s: card remove detected\n", mmc_hostname(host));
 	}
 
 	return ret;
@@ -2484,7 +2500,7 @@ void mmc_rescan(struct work_struct *work)
 	struct mmc_host *host =
 		container_of(work, struct mmc_host, detect.work);
 	int i;
-
+        printk("%s ,Index:%s, rescan_disable:%d, rescan_entered:%d\n", __FUNCTION__,mmc_hostname(host),host->rescan_disable,host->rescan_entered);
 	if (host->trigger_card_event && host->ops->card_event) {
 		host->ops->card_event(host);
 		host->trigger_card_event = false;
@@ -2547,6 +2563,10 @@ void mmc_rescan(struct work_struct *work)
 	mmc_release_host(host);
 
  out:
+#ifdef CONFIG_MARVELL_DRIVERS
+	if (host->detect_complete)
+		complete(host->detect_complete);
+#endif
 	if (!host->rescan_disable)
 		wake_lock_timeout(&host->detect_wake_lock, HZ / 2);
 	if (host->caps & MMC_CAP_NEEDS_POLL)
@@ -2562,22 +2582,27 @@ void mmc_start_host(struct mmc_host *host)
 		mmc_power_off(host);
 	else
 		mmc_power_up(host, host->ocr_avail);
-
-	if (host->caps2 & MMC_CAP2_SKIP_INIT_SCAN) {
-		printk("%s skip mmc detect change\n", mmc_hostname(host));
-	} else {
-#ifdef CONFIG_QCOM_WIFI
+#if defined(CONFIG_QCOM_WIFI) || defined(CONFIG_BCM4343)  || defined(CONFIG_BCM4343_MODULE) || \
+	defined(CONFIG_BCM43454)  || defined(CONFIG_BCM43454_MODULE) || \
+	defined(CONFIG_BCM43455)  || defined(CONFIG_BCM43455_MODULE)
 	if (!strcmp("mmc1", mmc_hostname(host))) {
 		printk("%s skip mmc_detect_change\n", mmc_hostname(host));
+	} else if (host->caps2 & MMC_CAP2_SKIP_INIT_SCAN) {
+		printk("%s skip mmc detect change\n", mmc_hostname(host));
 	} else {
 		mmc_gpiod_request_cd_irq(host);
 		_mmc_detect_change(host, 0, false);
 	}
 #else
+	if (host->caps2 & MMC_CAP2_SKIP_INIT_SCAN) {
+		printk("%s skip mmc detect change\n", mmc_hostname(host));
+	} else {
 		mmc_gpiod_request_cd_irq(host);
 		_mmc_detect_change(host, 0, false);
-#endif
 	}
+#endif /* CONFIG_QCOM_WIFI || CONFIG_BCM4343 || CONFIG_BCM4343_MODULE || \
+	CONFIG_BCM43454 || CONFIG_BCM43454_MODULE || \
+	CONFIG_BCM43455 || CONFIG_BCM43455_MODULE */
 }
 
 void mmc_stop_host(struct mmc_host *host)
@@ -2817,6 +2842,23 @@ destroy_workqueue:
 
 	return ret;
 }
+#if defined(CONFIG_BCM4343) || defined(CONFIG_BCM4343_MODULE) || \
+	defined(CONFIG_BCM43454) || defined(CONFIG_BCM43454_MODULE) || \
+	defined(CONFIG_BCM43455) || defined(CONFIG_BCM43455_MODULE)
+void mmc_ctrl_power(struct mmc_host *host, bool onoff)
+{
+	 if (!onoff) {
+		mmc_claim_host(host);
+                mmc_set_clock(host, host->f_init);
+		mmc_delay(1);
+		mmc_release_host(host);
+	 }
+}
+EXPORT_SYMBOL(mmc_ctrl_power);
+#endif /* CONFIG_BCM4343 || CONFIG_BCM4343_MODULE || \
+	  CONFIG_BCM43454 || CONFIG_BCM43454_MODULE || \
+	  CONFIG_BCM43455 || CONFIG_BCM43455_MODULE */
+
 
 static void __exit mmc_exit(void)
 {
