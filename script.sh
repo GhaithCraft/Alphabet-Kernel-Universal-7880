@@ -10,6 +10,6 @@ echo "CleanUp"
 make clean && make mrproper
 
 echo "Stock DEFCON"
-make Alphabet_Kernel_a7y17lte_defconfig
-#make Alphabet_Kernel_a5y17lte_defconfig
+make Alphabet_Kernel_a5y17lte_defconfig
+#make Alphabet_Kernel_a7y17lte_defconfig
 make -j3
