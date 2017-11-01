@@ -1,7 +1,7 @@
 #!/bin/bash
 #Cleanup before build
 
-echo "Compile wtih linaro Toolchain"
+echo "Compile wtih GCC 6.4.1 Toolchain"
 export CROSS_COMPILE=/home/ghaith/android/Toolchains/aarch64-cortex_a53-linux-gnueabi-gcc-6/bin/aarch64-cortex_a53-linux-gnueabi-
 #export CROSS_COMPILE=/home/ghaith/android/Toolchains/gcc-linaro-7.1.1-2017.08-i686_aarch64-linux-gnu/bin/aarch64-linux-gnu-
 ARCH=arm64
