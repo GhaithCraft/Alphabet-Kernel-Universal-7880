@@ -1,0 +1,3 @@
+-Updated AKM
+-Added Boeffla WakeLock Blocker Driver (Use AKM to control WakeLocks)
+-Updated Linux 3.18.85
